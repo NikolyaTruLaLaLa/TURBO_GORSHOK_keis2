@@ -1,0 +1,39 @@
+openapi: 3.0.3
+
+info:
+  title: Cyclic Reference Example
+  version: 1.0.0
+
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+
+components:
+  schemas:
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+
+    Address:
+      type: object
+      properties:
+        city:
+          type: string
+        owner:
+          $ref: '#/components/schemas/User'

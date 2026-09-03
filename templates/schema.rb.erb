@@ -1,0 +1,5 @@
+class <%= class_name %>
+<% properties.each do |name, property| %>
+  attr_accessor :<%= name %>
+<% end %>
+end
