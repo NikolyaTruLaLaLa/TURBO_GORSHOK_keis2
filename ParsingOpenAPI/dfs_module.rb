@@ -16,7 +16,8 @@ class DFS_Module
   attr_reader :webhooks_map
 
   def initialize
-    @document = Openapi3Parser.load_file("provider_api.yaml")
+    @folder = "yaml_examples"
+    @document = Openapi3Parser.load_file("..//" + @folder + "//" + "provider_api.yaml")
 
     @schemas_map = {}
     @endpoints_map = {}
