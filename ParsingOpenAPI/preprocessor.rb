@@ -2,6 +2,7 @@
 
 require "openapi3_parser"
 require_relative "service_manifest"
+require_relative "heuristics/create_endpoint_heuristic"
 
 class Preprocessor
   Endpoint = Data.define(
@@ -14,6 +15,7 @@ class Preprocessor
   attr_reader :endpoints_map
   attr_reader :webhooks_map
   attr_reader :servers_map
+  attr_reader :heuristic_data
 
   HTTP_METHODS = %i[
     get
@@ -26,11 +28,14 @@ class Preprocessor
     trace
   ].freeze
 
+  HEURISTICS = [CreateEndpointHeuristic].freeze
+
   def initialize(spec_path)
     @schemas_map = {}
     @endpoints_map = {}
     @webhooks_map = {}
     @servers_map = {}
+    @heuristic_data = []
 
     @document = Openapi3Parser.load_file(spec_path)
   end
@@ -40,18 +45,19 @@ class Preprocessor
     fill_schemas
     fill_webhooks
     fill_servers
+    fill_heuristic_data
 
     print_maps
 
     provider_name = @document.info["title"].gsub(/\s+/, "_")
-    serversManifest = ServiceManifest.new(
+    ServiceManifest.new(
       provider_name,
       schemas_map,
       endpoints_map,
       webhooks_map,
-      servers_map
+      servers_map,
+      heuristic_data   # добавляем шестой аргумент
     )
-    return serversManifest
   end
 
   private
@@ -62,15 +68,26 @@ class Preprocessor
     end
   end
 
+  def fill_heuristic_data
+    HEURISTICS.each do |heuristic_class|
+      heuristic = heuristic_class.new
+      data = {
+        endpoints_map: @endpoints_map,
+        schemas_map: @schemas_map,
+        servers: @servers_map
+      }
+      result = heuristic.classify(data)
+      @heuristic_data << result if result
+    end
+  end
+
   def fill_endpoints
     @document.paths.each do |path, path_item|
       HTTP_METHODS.each do |method|
         operation = path_item.public_send(method)
-
         next unless operation
 
         key = "#{method.upcase} #{path}"
-
         @endpoints_map[key] = Endpoint.new(
           path,
           method,
@@ -85,7 +102,6 @@ class Preprocessor
       next unless endpoint.operation.tags&.include?("Webhooks")
 
       name = endpoint.operation.operation_id || key
-
       @webhooks_map[name] = endpoint
     end
   end
@@ -98,7 +114,6 @@ class Preprocessor
 
   def print_maps
     puts "\n=== Схемы(#{@schemas_map.size}) ==="
-
     @schemas_map.each do |key, schema|
       puts "KEY: #{key}"
       pp schema
@@ -106,7 +121,6 @@ class Preprocessor
     end
 
     puts "\n=== Эндпоинты(#{@endpoints_map.size}) ==="
-
     @endpoints_map.each do |key, endpoint|
       puts "KEY: #{key}"
       puts "PATH: #{endpoint.path}"
@@ -116,7 +130,6 @@ class Preprocessor
     end
 
     puts "\n=== Вебхуки(#{@webhooks_map.size}) ==="
-
     @webhooks_map.each do |key, endpoint|
       puts "KEY: #{key}"
       puts "PATH: #{endpoint.path}"
@@ -132,11 +145,4 @@ class Preprocessor
       puts
     end
   end
-
 end
-
-pr = Preprocessor.new(
-  File.expand_path("../yaml_examples/provider_api.yaml", __dir__)
-)
-
-pr.process

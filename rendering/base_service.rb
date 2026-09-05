@@ -4,7 +4,7 @@ class BaseService
     def check_conditions(operation, request_method) # предпроверки
     end
 
-    def create_request(operation, ...) # создание выплаты/депозита
+    def create_request(operation, request_method) # создание выплаты/депозита
     end
 
     def process_callback(payload) # обработка webhook

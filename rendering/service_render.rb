@@ -1,28 +1,55 @@
+# Rendering/service_render.rb
 require_relative 'base_render'
+require_relative 'method_driver/create_request_method_driver'
 
 class ServiceRender < BaseRender
+  def initialize(output_filename = 'service.rb')
+    @output_filename = output_filename
+    @method_drivers = [
+      CreateRequestMethodDriver.new,
+      # другие драйверы позже
+    ]
+  end
 
-    def initialize(output_file_path, manifest)
-        @output_file_path = output_file_path
-        @manifest = manifest
-    end
+  def output_filename
+    @output_filename
+  end
 
-    # @param [ServiceManifest in ../ParsingOpenAPI/service_manifest.rb] data
-    def render(data)
-        template = ERB.new(
-            File.read("templates/new_service.rb.erb")
-        )
+  def render(data)
+    @manifest = data
+    methods_code = @method_drivers.map { |driver| driver.generate(@manifest) }.join("\n\n")
 
-        result = template.result_with_hash()
+    provider_name = @manifest.provider_name
+    provider_class_name = provider_name.split('_').map(&:capitalize).join
+    default_base_url = extract_default_base_url
+    status_mapping = extract_status_mapping
+    error_mapping = extract_error_mapping
 
+    template_path = File.join(__dir__, 'templates', 'new_service.rb.erb')
+    template = ERB.new(File.read(template_path), trim_mode: '-')
+    template.result_with_hash(
+        provider_name: provider_name,
+        provider_class_name: provider_class_name,
+        default_base_url: default_base_url,
+        status_mapping: status_mapping,
+        error_mapping: error_mapping,
+        methods_code: methods_code
+    )
+  end
 
-        return
-    end
+  private
 
-    private
+  def extract_default_base_url
+    @manifest.servers['Production'] || @manifest.servers.values.first || ''
+  end
 
-    def make_paylod_handler()
+  def extract_status_mapping
+    # TODO: из эвристики
+    {}
+  end
 
-    end
-
+  def extract_error_mapping
+    # TODO: из эвристики
+    {}
+  end
 end

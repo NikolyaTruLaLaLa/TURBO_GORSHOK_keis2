@@ -1,0 +1,15 @@
+<%- 
+  # Принимает переменные:
+  # method_name: 'build_payout_payload' или 'build_deposit_payload'
+  # fields: массив хешей с полями (name, type, required, format, properties)
+  # type: 'payout' или 'deposit'
+-%>
+private
+
+def <%= method_name %>(operation)
+  {
+<%- fields.each do |field| -%>
+    <%= field[:name] %>: <%= field_mapping(field, type) %>,
+<%- end -%>
+  }.compact
+end

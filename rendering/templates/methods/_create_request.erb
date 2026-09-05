@@ -1,0 +1,38 @@
+<%- 
+  # Принимает переменные:
+  # has_payout: boolean
+  # has_deposit: boolean
+  # payout_path: string (или nil)
+  # deposit_path: string (или nil)
+-%>
+def create_request(operation, request_method = 'create')
+<%- if has_payout && has_deposit -%>
+  case request_method
+  when 'deposit'
+    payload = build_deposit_payload(operation)
+    endpoint = '<%= deposit_path %>'
+  when 'payout', 'create'
+    payload = build_payout_payload(operation)
+    endpoint = '<%= payout_path %>'
+  else
+    return failure(:unprocessable_entity, 'unknown_request_method')
+  end
+  <%- elsif has_payout -%>
+    payload = build_payout_payload(operation)
+    endpoint = '<%= payout_path %>'
+  <%- elsif has_deposit -%>
+    payload = build_deposit_payload(operation)
+    endpoint = '<%= deposit_path %>'
+  <%- else -%>
+    raise NotImplementedError, "No create endpoint found"
+  <%- end -%>
+
+    response = client.post("\#{BASE_URL}\#{endpoint}", json: payload, headers: auth_headers)
+    parse_create_response(operation, response, request_method)
+  rescue Provider::RateLimitError
+    failure(:too_many_requests, 'provider.rate_limit')
+  rescue Provider::UnauthorizedError
+    failure(:unauthorized, 'provider.invalid_credentials')
+  rescue => e
+    failure(:internal_error, 'provider.unexpected_error')
+end
