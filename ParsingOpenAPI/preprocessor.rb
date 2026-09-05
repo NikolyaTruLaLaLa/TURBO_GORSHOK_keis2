@@ -31,7 +31,8 @@ class Preprocessor
     trace
   ].freeze
 
-  HEURISTICS = [CreateEndpointHeuristic, WebhookSigningHeuristic, DigitalSigningHeuristic, DataFieldsEncryptionHeuristic].freeze
+  HEURISTICS = [CreateEndpointHeuristic, WebhookSigningHeuristic, DigitalSigningHeuristic,
+                DataFieldsEncryptionHeuristic].freeze
 
   def initialize(spec_path)
     @schemas_map = {}
@@ -59,7 +60,7 @@ class Preprocessor
       endpoints_map,
       webhooks_map,
       servers_map,
-      heuristic_data   # добавляем шестой аргумент
+      heuristic_data # добавляем шестой аргумент
     )
   end
 

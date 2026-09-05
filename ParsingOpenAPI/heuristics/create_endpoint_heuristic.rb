@@ -2,7 +2,6 @@
 require_relative 'heuristic'
 require_relative '../schema_extractor'
 
-
 class CreateEndpointHeuristic < Heuristic
   def classify(data)
     endpoints = data[:endpoints_map]

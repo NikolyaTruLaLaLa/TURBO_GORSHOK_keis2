@@ -8,8 +8,8 @@ class Generator
 
   def generate
     generate_schemas
-    ##generate_endpoints
-    ##generate_webhooks
+    # #generate_endpoints
+    # #generate_webhooks
   end
 
   private

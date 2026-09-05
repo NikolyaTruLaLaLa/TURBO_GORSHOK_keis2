@@ -1,5 +1,4 @@
 class PayoutResponse
-
   attr_accessor :id
 
   attr_accessor :external_id
@@ -17,5 +16,4 @@ class PayoutResponse
   attr_accessor :created_at
 
   attr_accessor :completed_at
-
 end

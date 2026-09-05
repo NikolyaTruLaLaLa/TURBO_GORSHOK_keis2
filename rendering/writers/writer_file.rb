@@ -1,4 +1,3 @@
-
 class WriterFile
   def write(content, directory, filename)
     FileUtils.mkdir_p(directory) unless Dir.exist?(directory)

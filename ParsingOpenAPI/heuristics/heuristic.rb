@@ -2,7 +2,7 @@
 
 class Heuristic
   def classify(data)
-    raise NotImplementedError, "#{self.class} is abstract class" if self.class == Heuristic 
+    raise NotImplementedError, "#{self.class} is abstract class" if self.class == Heuristic
   end
 
   private
@@ -27,7 +27,4 @@ class Heuristic
 
     return true
   end
-
-
-
 end

@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative 'heuristic'
 
 class DigitalSigningHeuristic < Heuristic
@@ -44,6 +45,7 @@ class DigitalSigningHeuristic < Heuristic
 
     check_finded_data(result)
     return nil if result.empty?
+
     { name: self.class.name, finded_data: result }
   end
 
@@ -69,6 +71,7 @@ class DigitalSigningHeuristic < Heuristic
     return true if EXCLUDED_PATHS.any? { |keyword| path.include?(keyword) }
     return true if tags.any? { |tag| EXCLUDED_TAGS.include?(tag.downcase) }
     return true if EXCLUDED_PATHS.any? { |keyword| operation_id.include?(keyword) }
+
     false
   end
 
@@ -94,6 +97,7 @@ class DigitalSigningHeuristic < Heuristic
     headers.each do |name, data|
       if SIGNATURE_HEADERS.any? { |keyword| name.include?(keyword) }
         next if name.include?('authorization')
+
         signature_headers << data[:name]
       end
     end

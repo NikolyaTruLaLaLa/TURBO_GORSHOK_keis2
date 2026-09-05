@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative 'method_driver'
 require_relative '../heuristic_handler/digital_signing_handler'
 

@@ -7,13 +7,13 @@ class GeneratorPipeline
 
   def initialize(renders:, file_path:, writer: nil)
     @renders = renders
-    @preprocessor = Preprocessor.new(file_path)  
-    @writer = writer || WriterFile.new   
+    @preprocessor = Preprocessor.new(file_path)
+    @writer = writer || WriterFile.new
   end
 
   def run(goal_directory)
     puts "Pipeline starts"
-    processed_data = @preprocessor.process 
+    processed_data = @preprocessor.process
 
     @renders.each do |render|
       result = render.render(processed_data)

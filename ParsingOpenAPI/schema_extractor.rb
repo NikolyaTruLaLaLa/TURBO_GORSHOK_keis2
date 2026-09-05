@@ -37,9 +37,9 @@ module SchemaExtractor
     end
 
     if ref && ref.include?('components/schemas/')
-      return ref.split('/').last  # возвращаем имя схемы
+      return ref.split('/').last # возвращаем имя схемы
     end
 
-    schema  # inline-схема – возвращаем объект
+    schema # inline-схема – возвращаем объект
   end
 end

@@ -9,7 +9,6 @@ require_relative 'method_driver/digital_signing_method_driver'
 require_relative 'method_driver/data_encryption_method_driver'
 require_relative '../ParsingOpenAPI/schema_extractor'
 
-
 class ServiceRender < BaseRender
   def initialize(output_filename = 'service.rb')
     @output_filename = output_filename
@@ -19,7 +18,7 @@ class ServiceRender < BaseRender
       ProcessCallbackMethodDriver.new,
       CheckConditionsMethodDriver.new,
       WebhookSigningMethodDriver.new,
-      DigitalSigningMethodDriver.new ,
+      DigitalSigningMethodDriver.new,
       DataEncryptionMethodDriver.new,
     ]
   end
@@ -41,12 +40,12 @@ class ServiceRender < BaseRender
     template_path = File.join(__dir__, 'templates', 'new_service.rb.erb')
     template = ERB.new(File.read(template_path), trim_mode: '-')
     template.result_with_hash(
-        provider_name: provider_name,
-        provider_class_name: provider_class_name,
-        default_base_url: default_base_url,
-        status_mapping: status_mapping,
-        error_mapping: error_mapping,
-        methods_code: methods_code
+      provider_name: provider_name,
+      provider_class_name: provider_class_name,
+      default_base_url: default_base_url,
+      status_mapping: status_mapping,
+      error_mapping: error_mapping,
+      methods_code: methods_code
     )
   end
 
@@ -80,6 +79,7 @@ class ServiceRender < BaseRender
     # Проверяем наличие ключей через прямой доступ
     return properties['event'] if properties['event']
     return properties['type'] if properties['type']
+
     nil
   end
 
@@ -116,9 +116,11 @@ class ServiceRender < BaseRender
 
     operations.each do |operation|
       next unless operation.respond_to?(:responses)
+
       operation.responses.each do |status, _response|
         status_str = status.to_s
         next unless status_str.match?(/^[45]\d\d$/)
+
         internal = default_codes[status_str] || 'internal_error'
         mapping[status_str] = internal
       end
@@ -135,6 +137,7 @@ class ServiceRender < BaseRender
     @manifest.endpoints_map.each do |_name, endpoint|
       operation = endpoint.respond_to?(:operation) ? endpoint.operation : endpoint
       next unless operation
+
       ops << operation
     end
     ops

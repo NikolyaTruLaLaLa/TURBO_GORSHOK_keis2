@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative 'heuristic'
 require "openapi3_parser"
 
@@ -6,7 +7,7 @@ class WebhookSigningHeuristic < Heuristic
   HEURISTIC_NAME = 'WebhookSigningHeuristic'
 
   def classify(data)
-    endpoints = data[:endpoints_map]  # теперь используем хеш
+    endpoints = data[:endpoints_map] # теперь используем хеш
     return nil if endpoints.nil? || endpoints.empty?
 
     webhook_endpoints = find_all_webhook_endpoints(endpoints)
@@ -34,6 +35,7 @@ class WebhookSigningHeuristic < Heuristic
 
     check_finded_data(result)
     return nil if result.empty?
+
     { name: self.class.name, finded_data: result }
   end
 
@@ -58,6 +60,7 @@ class WebhookSigningHeuristic < Heuristic
   def find_signature_header(operation)
     operation.parameters.each do |param|
       next unless param.in == 'header' && param.name
+
       name = param.name.downcase
       if name.include?('signature') && !name.include?('authorization')
         return param.name

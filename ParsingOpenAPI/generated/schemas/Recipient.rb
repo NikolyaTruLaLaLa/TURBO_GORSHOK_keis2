@@ -1,5 +1,4 @@
 class Recipient
-
   attr_accessor :type
 
   attr_accessor :phone
@@ -9,5 +8,4 @@ class Recipient
   attr_accessor :bank_name
 
   attr_accessor :card_number
-
 end

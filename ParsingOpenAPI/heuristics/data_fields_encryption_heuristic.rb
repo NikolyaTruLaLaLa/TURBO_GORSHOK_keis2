@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require_relative 'heuristic'
 require_relative '../schema_extractor'
 
@@ -76,8 +77,10 @@ class DataFieldsEncryptionHeuristic < Heuristic
 
     %i[any_of one_of all_of].each do |key|
       next unless schema.respond_to?(key)
+
       schemas = schema.public_send(key)
       next unless schemas
+
       schemas.each do |sub_schema|
         traverse_schema(sub_schema, operation_info, sensitive_fields, path_prefix)
       end
