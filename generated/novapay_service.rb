@@ -9,6 +9,14 @@ class Provider::NovapayPayoutApiService < BaseService
   }.freeze
 
   ERROR_MAP = {
+    400 => 'validation_error',
+    401 => 'unauthorized',
+    402 => 'insufficient_balance',
+    409 => 'internal_error',
+    422 => 'validation_error',
+    429 => 'rate_limit',
+    500 => 'internal_error',
+    404 => 'not_found',
   }.freeze
 
   def create_request(operation, request_method = 'create')
@@ -16,13 +24,13 @@ class Provider::NovapayPayoutApiService < BaseService
     endpoint = '/payouts'
 
     response = client.post("\#{BASE_URL}\#{endpoint}", json: payload, headers: auth_headers)
+
+    unless response.status.between?(200, 299)
+      error_key = ERROR_MAP[response.status] || 'unknown_error'
+      return failure(error_key, "provider.http_error_#{response.status}")
+    end
+
     parse_create_response(operation, response, request_method)
-  rescue Provider::RateLimitError
-    failure(:too_many_requests, 'provider.rate_limit')
-  rescue Provider::UnauthorizedError
-    failure(:unauthorized, 'provider.invalid_credentials')
-  rescue => e
-    failure(:internal_error, 'provider.unexpected_error')
 end
 
 private
@@ -48,13 +56,13 @@ end
 
   def fetch_status(operation)
     response = client.get("\#{BASE_URL}/payouts/#{operation.provider_operation_id}", headers: auth_headers)
+
+    unless response.status.between?(200, 299)
+      error_key = ERROR_MAP[response.status] || 'unknown_error'
+      return failure(error_key, "provider.http_error_#{response.status}")
+    end
+
     map_status(response.body['status'])
-    rescue Provider::RateLimitError
-      failure(:too_many_requests, 'provider.rate_limit')
-    rescue Provider::UnauthorizedError
-      failure(:unauthorized, 'provider.invalid_credentials')
-    rescue => e
-      failure(:internal_error, 'provider.unexpected_error')
   end
 
   private

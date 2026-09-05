@@ -1,4 +1,4 @@
-<%- 
+<%-
   # Принимает переменные:
   # has_payout: boolean
   # has_deposit: boolean
@@ -28,11 +28,11 @@ def create_request(operation, request_method = 'create')
   <%- end -%>
 
     response = client.post("\#{BASE_URL}\#{endpoint}", json: payload, headers: auth_headers)
+
+    unless response.status.between?(200, 299)
+      error_key = ERROR_MAP[response.status] || 'unknown_error'
+      return failure(error_key, "provider.http_error_#{response.status}")
+    end
+
     parse_create_response(operation, response, request_method)
-  rescue Provider::RateLimitError
-    failure(:too_many_requests, 'provider.rate_limit')
-  rescue Provider::UnauthorizedError
-    failure(:unauthorized, 'provider.invalid_credentials')
-  rescue => e
-    failure(:internal_error, 'provider.unexpected_error')
 end
