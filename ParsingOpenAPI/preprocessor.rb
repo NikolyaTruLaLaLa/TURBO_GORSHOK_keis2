@@ -44,13 +44,14 @@ class Preprocessor
     print_maps
 
     provider_name = @document.info["title"].gsub(/\s+/, "_")
-    ServiceManifest.new(
+    serversManifest = ServiceManifest.new(
       provider_name,
       schemas_map,
       endpoints_map,
       webhooks_map,
       servers_map
     )
+    return serversManifest
   end
 
   private
