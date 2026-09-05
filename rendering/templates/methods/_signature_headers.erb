@@ -1,0 +1,21 @@
+<%- algorithm_downcase = algorithm.downcase.gsub('-', '') -%>
+private
+
+def generate_signature(payload, secret)
+  payload_json = payload.to_json
+  OpenSSL::HMAC.hexdigest('<%= algorithm_downcase %>', secret, payload_json)
+end
+
+def signature_headers(payload)
+  secret = credentials.signing_secret
+  timestamp = Time.now.to_i.to_s
+  nonce = SecureRandom.hex(16)
+  signature = generate_signature(payload.merge(timestamp: timestamp, nonce: nonce), secret)
+
+  headers = {
+    '<%= signature_header %>' => signature,
+    '<%= timestamp_header %>' => timestamp,
+    '<%= nonce_header %>' => nonce
+  }.compact
+  headers
+end

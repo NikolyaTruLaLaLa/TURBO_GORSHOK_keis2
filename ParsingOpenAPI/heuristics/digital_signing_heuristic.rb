@@ -1,10 +1,8 @@
 # frozen_string_literal: true
 require_relative 'heuristic'
-require "openapi3_parser"
 
 class DigitalSigningHeuristic < Heuristic
   HEURISTIC_NAME = 'DigitalSigningHeuristic'
-  HTTP_METHODS = %i[get post put patch delete head options].freeze
 
   # Все необходимые заголовки и ключевые слова
   SIGNATURE_HEADERS = %w[signature sig hmac digest auth].freeze
@@ -14,7 +12,7 @@ class DigitalSigningHeuristic < Heuristic
   EXCLUDED_TAGS = %w[webhooks].freeze
 
   def classify(data)
-    endpoints = extract_endpoints(data)
+    endpoints = extract_endpoints(data) # передаём data[:endpoints_map] или всё data
     result = {}
 
     endpoints.each do |ep|
@@ -46,7 +44,22 @@ class DigitalSigningHeuristic < Heuristic
 
     check_finded_data(result)
     return nil if result.empty?
-    { HEURISTIC_NAME => result }
+    { name: self.class.name, finded_data: result }
+  end
+
+  private
+
+  def extract_endpoints(data)
+    endpoints = []
+    endpoints_map = data[:endpoints_map] || data # если передана вся data, берём :endpoints_map
+    endpoints_map.each do |key, endpoint|
+      endpoints << {
+        path: endpoint.path,
+        method: endpoint.http_method,
+        operation: endpoint.operation
+      }
+    end
+    endpoints
   end
 
   def webhook_endpoint?(ep)
@@ -59,20 +72,6 @@ class DigitalSigningHeuristic < Heuristic
     false
   end
 
-  def extract_endpoints(data)
-    endpoints = []
-    data.paths.each do |path, path_item|
-      HTTP_METHODS.each do |method|
-        operation = path_item.public_send(method)
-        next unless operation
-
-        endpoints << { path: path, method: method, operation: operation }
-      end
-    end
-    endpoints
-  end
-
-  # Извлекает все заголовки из параметров операции
   def extract_headers(operation)
     headers = {}
     operation.parameters.each do |param|
@@ -102,12 +101,26 @@ class DigitalSigningHeuristic < Heuristic
     signature_headers
   end
 
-  # Проверяет описание на наличие ключевых слов
+  def find_timestamp_header(headers)
+    headers.each do |name, data|
+      return data[:name] if TIMESTAMP_HEADERS.any? { |keyword| name.include?(keyword) }
+    end
+    nil
+  end
+
+  def find_nonce_header(headers)
+    # Ищем nonce, salt, random и т.п.
+    nonce_keywords = %w[nonce salt random]
+    headers.each do |name, data|
+      return data[:name] if nonce_keywords.any? { |keyword| name.include?(keyword) }
+    end
+    nil
+  end
+
   def description_matches?(description)
     DESCRIPTION_KEYWORDS.any? { |kw| description.downcase.include?(kw) }
   end
 
-  # Извлекает алгоритм из описания
   def extract_algorithm(description)
     patterns = [
       /HMAC-SHA256/i,
@@ -126,10 +139,4 @@ class DigitalSigningHeuristic < Heuristic
     end
     nil
   end
-
 end
-
-data = Openapi3Parser.load_file(File.expand_path("../../yaml_examples/provider_api.yaml", __dir__))
-heuristic = DigitalSigningHeuristic.new()
-result = heuristic.classify(data)
-puts "Result: #{result.inspect}" if result

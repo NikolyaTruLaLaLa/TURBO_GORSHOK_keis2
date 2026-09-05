@@ -4,6 +4,9 @@ require_relative 'method_driver/create_request_method_driver'
 require_relative 'method_driver/fetch_status_method_driver'
 require_relative 'method_driver/process_callback_method_driver'
 require_relative 'method_driver/check_conditions_method_driver'
+require_relative 'method_driver/webhook_signing_method_driver'
+require_relative 'method_driver/digital_signing_method_driver'
+require_relative 'method_driver/data_encryption_method_driver'
 require_relative '../ParsingOpenAPI/schema_extractor'
 
 
@@ -14,7 +17,10 @@ class ServiceRender < BaseRender
       CreateRequestMethodDriver.new,
       FetchStatusMethodDriver.new,
       ProcessCallbackMethodDriver.new,
-      CheckConditionsMethodDriver.new
+      CheckConditionsMethodDriver.new,
+      WebhookSigningMethodDriver.new,
+      DigitalSigningMethodDriver.new ,
+      DataEncryptionMethodDriver.new,
     ]
   end
 
@@ -50,7 +56,7 @@ class ServiceRender < BaseRender
     @manifest.servers['Production'] || @manifest.servers.values.first || ''
   end
 
-    def extract_status_mapping
+  def extract_status_mapping
     mapping = []
     @manifest.webhooks_map.each do |name, endpoint|
       schema = SchemaExtractor.request_schema(endpoint.operation)

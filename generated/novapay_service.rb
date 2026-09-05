@@ -127,4 +127,47 @@ end
 
   success
 end
+
+private
+
+def verify_signature!(payload)
+  provided_signature = request.headers['X-NovaPay-Signature']
+  return unless provided_signature
+
+  secret = credentials.webhook_secret
+  expected_signature = OpenSSL::HMAC.hexdigest('hmacsha256', secret, payload.to_json)
+  unless ActiveSupport::SecurityUtils.secure_compare(expected_signature, provided_signature)
+    raise Provider::SignatureError, "Invalid signature"
+  end
+end
+
+
+
+private
+
+def encrypt_sensitive_data(payload)
+  encrypted_payload = payload.dup
+  if encrypted_payload.key?('card_number')
+    encrypted_payload['card_number'] = encrypt_field(encrypted_payload['card_number'])
+  end
+  encrypted_payload
+end
+
+def encrypt_field(value)
+  # TODO: Implement encryption logic
+  value
+end
+
+def decrypt_sensitive_data(payload)
+  decrypted_payload = payload.dup
+  if decrypted_payload.key?('card_number')
+    decrypted_payload['card_number'] = decrypt_field(decrypted_payload['card_number'])
+  end
+  decrypted_payload
+end
+
+def decrypt_field(value)
+  # TODO: Implement decryption logic
+  value
+end
 end

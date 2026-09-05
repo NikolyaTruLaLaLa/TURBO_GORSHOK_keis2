@@ -1,0 +1,31 @@
+private
+
+def encrypt_sensitive_data(payload)
+  encrypted_payload = payload.dup
+  <%- sensitive_fields.each do |field_name, info| -%>
+  if encrypted_payload.key?('<%= field_name %>')
+    encrypted_payload['<%= field_name %>'] = encrypt_field(encrypted_payload['<%= field_name %>'])
+  end
+  <%- end -%>
+  encrypted_payload
+end
+
+def encrypt_field(value)
+  # TODO: Implement encryption logic
+  value
+end
+
+def decrypt_sensitive_data(payload)
+  decrypted_payload = payload.dup
+  <%- sensitive_fields.each do |field_name, info| -%>
+  if decrypted_payload.key?('<%= field_name %>')
+    decrypted_payload['<%= field_name %>'] = decrypt_field(decrypted_payload['<%= field_name %>'])
+  end
+  <%- end -%>
+  decrypted_payload
+end
+
+def decrypt_field(value)
+  # TODO: Implement decryption logic
+  value
+end

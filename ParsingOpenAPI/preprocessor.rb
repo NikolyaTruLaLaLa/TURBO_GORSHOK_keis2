@@ -3,6 +3,9 @@
 require "openapi3_parser"
 require_relative "service_manifest"
 require_relative "heuristics/create_endpoint_heuristic"
+require_relative "heuristics/webhook_signing_heuristic"
+require_relative "heuristics/digital_signing_heuristic"
+require_relative "heuristics/data_fields_encryption_heuristic"
 
 class Preprocessor
   Endpoint = Data.define(
@@ -28,7 +31,7 @@ class Preprocessor
     trace
   ].freeze
 
-  HEURISTICS = [CreateEndpointHeuristic].freeze
+  HEURISTICS = [CreateEndpointHeuristic, WebhookSigningHeuristic, DigitalSigningHeuristic, DataFieldsEncryptionHeuristic].freeze
 
   def initialize(spec_path)
     @schemas_map = {}
@@ -78,6 +81,12 @@ class Preprocessor
       }
       result = heuristic.classify(data)
       @heuristic_data << result if result
+      if result
+        @heuristic_data << result
+        puts "Added heuristic: #{result.keys}"
+      else
+        puts "Heuristic #{heuristic_class} returned nil"
+      end
     end
   end
 
