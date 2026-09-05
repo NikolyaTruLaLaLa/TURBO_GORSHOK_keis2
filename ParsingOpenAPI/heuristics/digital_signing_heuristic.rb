@@ -1,57 +1,63 @@
 # frozen_string_literal: true
 require_relative 'heuristic'
-require 'openapi3_parser'
+require "openapi3_parser"
 
-class DataFieldsEncryptionHeuristic < Heuristic
-  HEURISTIC_NAME = 'DataFieldsEncryptionHeuristic'
-
-  SENSITIVE_FIELD_NAMES = %w[
-    card_number pan cvv cvc password secret
-    encrypted_data encrypted_payload token
-  ].freeze
-
-  ENCRYPTION_KEYWORDS = %w[encrypt decrypt cipher secure].freeze
+class DigitalSigningHeuristic < Heuristic
+  HEURISTIC_NAME = 'DigitalSigningHeuristic'
   HTTP_METHODS = %i[get post put patch delete head options].freeze
+
+  # Все необходимые заголовки и ключевые слова
+  SIGNATURE_HEADERS = %w[signature sig hmac digest auth].freeze
+  TIMESTAMP_HEADERS = %w[timestamp ts nonce salt].freeze
+  DESCRIPTION_KEYWORDS = %w[hmac sha rsa sign verify algorithm signature].freeze
+  EXCLUDED_PATHS = %w[webhook callback notification].freeze
+  EXCLUDED_TAGS = %w[webhooks].freeze
 
   def classify(data)
     endpoints = extract_endpoints(data)
-    sensitive_fields = {}
+    result = {}
 
     endpoints.each do |ep|
+      next if webhook_endpoint?(ep)
+
       operation = ep[:operation]
-      operation_info = { path: ep[:path], method: ep[:method].to_s.upcase }
+      description = operation.description || ''
 
-      if operation.request_body
-        operation.request_body.content.each do |_media_type, media_type_obj|
-          schema = media_type_obj.schema
-          next unless schema
-          traverse_schema(schema, operation_info.merge(direction: 'request'), sensitive_fields)
-        end
-      end
+      headers = extract_headers(operation)
+      next if headers.empty?
 
-      # Анализируем responses
-      operation.responses.each do |status_code, response|
-        next unless response.content
-        response.content.each do |_media_type, media_type_obj|
-          schema = media_type_obj.schema
-          next unless schema
-          traverse_schema(schema, operation_info.merge(direction: 'response', status_code: status_code), sensitive_fields)
-        end
-      end
+      signature_headers = find_signature_headers(headers)
+      next if signature_headers.empty?
+
+      next unless description_matches?(description)
+
+      security_schemes = operation.security || []
+
+      endpoint_key = "#{ep[:method].to_s.upcase} #{ep[:path]}"
+
+      result[endpoint_key] = {
+        signature_header: signature_headers.first,
+        timestamp_header: find_timestamp_header(headers),
+        nonce_header: find_nonce_header(headers),
+        algorithm: extract_algorithm(description) || 'HMAC-SHA256',
+        has_security: !security_schemes.empty?
+      }
     end
 
-    check_finded_data(sensitive_fields)
-    return nil if sensitive_fields.empty?
-
-    {
-      HEURISTIC_NAME => {
-        sensitive_fields: sensitive_fields,
-        encryption_used: sensitive_fields.any? { |_, info| info[:encryption_mentioned] }
-      }
-    }
+    check_finded_data(result)
+    return nil if result.empty?
+    { HEURISTIC_NAME => result }
   end
 
-  private
+  def webhook_endpoint?(ep)
+    path = ep[:path].downcase
+    tags = ep[:operation].tags || []
+    operation_id = ep[:operation].operation_id&.downcase || ''
+    return true if EXCLUDED_PATHS.any? { |keyword| path.include?(keyword) }
+    return true if tags.any? { |tag| EXCLUDED_TAGS.include?(tag.downcase) }
+    return true if EXCLUDED_PATHS.any? { |keyword| operation_id.include?(keyword) }
+    false
+  end
 
   def extract_endpoints(data)
     endpoints = []
@@ -59,78 +65,71 @@ class DataFieldsEncryptionHeuristic < Heuristic
       HTTP_METHODS.each do |method|
         operation = path_item.public_send(method)
         next unless operation
+
         endpoints << { path: path, method: method, operation: operation }
       end
     end
     endpoints
   end
 
-  # Разрешение ссылок
-  def traverse_schema(schema, operation_info, sensitive_fields, path_prefix = '')
-    schema = schema.resolve if schema.respond_to?(:resolve)
-    return unless schema.respond_to?(:properties)
+  # Извлекает все заголовки из параметров операции
+  def extract_headers(operation)
+    headers = {}
+    operation.parameters.each do |param|
+      next unless param.in == 'header' && param.name
 
-    if schema.properties
-      schema.properties.each do |prop_name, prop_schema|
-        current_path = path_prefix.empty? ? prop_name : "#{path_prefix}.#{prop_name}"
+      name = param.name.downcase
+      headers[name] = {
+        name: param.name,
+        description: param.description || '',
+        required: param.required? || false,
+        schema: param.schema
+      }
+    end
+    headers
+  end
 
-        if sensitive_field?(prop_name, prop_schema)
-          add_sensitive_field(sensitive_fields, prop_name, current_path, operation_info, prop_schema)
-        end
+  def find_signature_headers(headers)
+    signature_headers = []
 
-        # Рекурсивно обходим вложенные объекты
-        if prop_schema.respond_to?(:properties) && prop_schema.properties
-          traverse_schema(prop_schema, operation_info, sensitive_fields, current_path)
-        elsif prop_schema.type == 'array' && prop_schema.items
-          traverse_schema(prop_schema.items, operation_info, sensitive_fields, current_path)
-        end
+    headers.each do |name, data|
+      if SIGNATURE_HEADERS.any? { |keyword| name.include?(keyword) }
+        next if name.include?('authorization')
+        signature_headers << data[:name]
       end
     end
 
-    if schema.type == 'array' && schema.items
-      traverse_schema(schema.items, operation_info, sensitive_fields, path_prefix)
-    end
-
-    %i[any_of one_of all_of].each do |key|
-      next unless schema.respond_to?(key)
-      schemas = schema.public_send(key)
-      next unless schemas
-      schemas.each do |sub_schema|
-        traverse_schema(sub_schema, operation_info, sensitive_fields, path_prefix)
-      end
-    end
+    signature_headers
   end
 
-  def sensitive_field?(field_name, field_schema)
-    name_match = SENSITIVE_FIELD_NAMES.any? { |kw| field_name.downcase.include?(kw) }
-
-    if field_name.downcase.include?('token') && field_schema.description
-      return false if field_schema.description.downcase =~ /(id|identifier|reference|jwt|access|refresh)/
-    end
-
-    description_match = field_schema.description &&
-                        ENCRYPTION_KEYWORDS.any? { |kw| field_schema.description.downcase.include?(kw) }
-
-    name_match || description_match
+  # Проверяет описание на наличие ключевых слов
+  def description_matches?(description)
+    DESCRIPTION_KEYWORDS.any? { |kw| description.downcase.include?(kw) }
   end
 
-  def add_sensitive_field(sensitive_fields, field_name, full_path, operation_info, field_schema)
-    unless sensitive_fields.key?(field_name)
-      sensitive_fields[field_name] = { operations: [], encryption_mentioned: false }
-    end
+  # Извлекает алгоритм из описания
+  def extract_algorithm(description)
+    patterns = [
+      /HMAC-SHA256/i,
+      /HMAC-SHA1/i,
+      /RSA-SHA256/i,
+      /SHA256/i,
+      /SHA1/i,
+      /algorithm\s*[:=]\s*([\w-]+)/i,
+      /signature\s+algorithm\s+is\s+([\w-]+)/i,
+      /using\s+(HMAC-SHA256|HMAC-SHA1|RSA-SHA256|SHA256|SHA1)/i
+    ]
 
-    op_key = "#{operation_info[:method]} #{operation_info[:path]} (#{operation_info[:direction]})"
-    unless sensitive_fields[field_name][:operations].include?(op_key)
-      sensitive_fields[field_name][:operations] << op_key
+    patterns.each do |pattern|
+      match = description.match(pattern)
+      return match[1] || match[0] if match
     end
-
-    if field_schema.description && ENCRYPTION_KEYWORDS.any? { |kw| field_schema.description.downcase.include?(kw) }
-      sensitive_fields[field_name][:encryption_mentioned] = true
-    end
+    nil
   end
+
 end
 
 data = Openapi3Parser.load_file(File.expand_path("../../yaml_examples/provider_api.yaml", __dir__))
-heuristic = DataFieldsEncryptionHeuristic.new()
+heuristic = DigitalSigningHeuristic.new()
 result = heuristic.classify(data)
 puts "Result: #{result.inspect}" if result
