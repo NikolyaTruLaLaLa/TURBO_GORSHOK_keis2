@@ -1,14 +1,20 @@
 # Rendering/service_render.rb
 require_relative 'base_render'
 require_relative 'method_driver/create_request_method_driver'
+require_relative 'method_driver/fetch_status_method_driver'
+require_relative 'method_driver/process_callback_method_driver'
+require_relative 'method_driver/check_conditions_method_driver'
 require_relative '../ParsingOpenAPI/schema_extractor'
+
 
 class ServiceRender < BaseRender
   def initialize(output_filename = 'service.rb')
     @output_filename = output_filename
     @method_drivers = [
       CreateRequestMethodDriver.new,
-      # другие драйверы позже
+      FetchStatusMethodDriver.new,
+      ProcessCallbackMethodDriver.new,
+      CheckConditionsMethodDriver.new
     ]
   end
 

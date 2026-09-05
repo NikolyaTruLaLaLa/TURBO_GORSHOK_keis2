@@ -1,0 +1,23 @@
+<%- 
+  # Принимает переменные:
+  # endpoint_path: строка с путём, например "/payouts/{payout_id}"
+  # param_name: имя параметра в пути, например "payout_id"
+-%>
+  public
+
+  def fetch_status(operation)
+    response = client.get("\#{BASE_URL}<%= endpoint_path.gsub(/\{#{param_name}\}/, "\#{operation.provider_operation_id}") %>", headers: auth_headers)
+    map_status(response.body['status'])
+    rescue Provider::RateLimitError
+      failure(:too_many_requests, 'provider.rate_limit')
+    rescue Provider::UnauthorizedError
+      failure(:unauthorized, 'provider.invalid_credentials')
+    rescue => e
+      failure(:internal_error, 'provider.unexpected_error')
+  end
+
+  private
+
+  def map_status(provider_status)
+    STATUS_MAP[provider_status] || 'unknown'
+  end

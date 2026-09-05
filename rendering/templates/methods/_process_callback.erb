@@ -1,0 +1,29 @@
+public
+
+def process_callback(payload)
+  verify_signature!(payload)
+  event = payload['event']
+  payout_id = payload['payout_id']
+
+  case event
+  <%- events.each do |event| -%>
+  when '<%= event %>'
+    <%- internal = map_event_to_status(event) -%>
+    <%- if internal == 'approved' -%>
+    approve_operation(payout_id)
+    <%- elsif internal == 'rejected' -%>
+    reject_operation(payout_id, payload.dig('error', 'code'))
+    <%- elsif internal == 'in_progress' -%>
+    update_operation_status(payout_id, 'in_progress')
+    <%- else -%>
+    failure(:unprocessable_entity, 'unknown_event')
+    <%- end -%>
+  <%- end -%>
+  else
+    failure(:unprocessable_entity, 'unknown_event')
+  end
+rescue Provider::SignatureError
+  failure(:unauthorized, 'provider.invalid_signature')
+rescue => e
+  failure(:internal_error, 'provider.unexpected_error')
+end

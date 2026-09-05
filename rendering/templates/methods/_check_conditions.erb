@@ -1,0 +1,12 @@
+public
+
+def check_conditions(operation, request_method)
+  base_result = super
+  return base_result if base_result.failed?
+
+  <%- validations.each do |check| -%>
+  <%= check %>
+  <%- end -%>
+
+  success
+end
