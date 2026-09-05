@@ -7,13 +7,13 @@
 
   def fetch_status(operation)
     response = client.get("\#{BASE_URL}<%= endpoint_path.gsub(/\{#{param_name}\}/, "\#{operation.provider_operation_id}") %>", headers: auth_headers)
+
+    unless response.status.between?(200, 299)
+      error_key = ERROR_MAP[response.status] || 'unknown_error'
+      return failure(error_key, "provider.http_error_#{response.status}")
+    end
+
     map_status(response.body['status'])
-    rescue Provider::RateLimitError
-      failure(:too_many_requests, 'provider.rate_limit')
-    rescue Provider::UnauthorizedError
-      failure(:unauthorized, 'provider.invalid_credentials')
-    rescue => e
-      failure(:internal_error, 'provider.unexpected_error')
   end
 
   private

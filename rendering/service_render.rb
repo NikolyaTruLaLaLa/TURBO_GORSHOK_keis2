@@ -97,7 +97,46 @@ class ServiceRender < BaseRender
   end
 
   def extract_error_mapping
-    # TODO: из эвристики
-    {}
+    default_codes = {
+      '400' => 'validation_error',
+      '401' => 'unauthorized',
+      '402' => 'insufficient_balance',
+      '403' => 'forbidden',
+      '404' => 'not_found',
+      '422' => 'validation_error',
+      '429' => 'rate_limit',
+      '500' => 'internal_error',
+      '502' => 'internal_error',
+      '503' => 'internal_error',
+      '504' => 'internal_error'
+    }
+
+    operations = collect_all_operations
+    mapping = {}
+
+    operations.each do |operation|
+      next unless operation.respond_to?(:responses)
+      operation.responses.each do |status, _response|
+        status_str = status.to_s
+        next unless status_str.match?(/^[45]\d\d$/)
+        internal = default_codes[status_str] || 'internal_error'
+        mapping[status_str] = internal
+      end
+    end
+
+    mapping = default_codes.dup if mapping.empty?
+    mapping
+  end
+
+  def collect_all_operations
+    ops = []
+    return ops unless @manifest.respond_to?(:endpoints_map)
+
+    @manifest.endpoints_map.each do |_name, endpoint|
+      operation = endpoint.respond_to?(:operation) ? endpoint.operation : endpoint
+      next unless operation
+      ops << operation
+    end
+    ops
   end
 end
