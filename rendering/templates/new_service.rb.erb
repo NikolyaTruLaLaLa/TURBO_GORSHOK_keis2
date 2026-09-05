@@ -1,0 +1,32 @@
+class Provider::<%= provider_name.camelcase %>Service < BaseService
+    BASE_URL = ENV.fetch('<%= provider_name.upcase %>_BASE_URL', '<%= default_base_url %>')
+
+    STATUS_MAP = {
+        <% status_mapping.each do |provider_status, internal_status| %>
+        '<%= provider_status %>' => '<%= internal_status %>',
+        <% end %>
+    }.freeze
+
+    ERROR_MAP = {
+        <% error_mapping.each do |http_code, internal_error| %>
+        <%= http_code %> => '<%= internal_error %>',
+        <% end %>
+    }.freeze
+
+    def create_request(operation, request_method = 'create')
+        case request_method
+        <%= switch_statements >
+        else
+            return failure(:unprocessable_entity, 'unknown_request_method')
+        end
+
+        response = client.post("#{BASE_URL}#{endpoint}", json: payload, headers: auth_headers)
+        parse_create_response(operation, response, request_method)
+    end
+
+    private
+
+
+    <%= methods_payload %>
+    
+end
