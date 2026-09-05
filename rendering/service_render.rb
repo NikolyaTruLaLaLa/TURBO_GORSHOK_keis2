@@ -1,6 +1,7 @@
 # Rendering/service_render.rb
 require_relative 'base_render'
 require_relative 'method_driver/create_request_method_driver'
+require_relative '../ParsingOpenAPI/schema_extractor'
 
 class ServiceRender < BaseRender
   def initialize(output_filename = 'service.rb')
@@ -43,9 +44,44 @@ class ServiceRender < BaseRender
     @manifest.servers['Production'] || @manifest.servers.values.first || ''
   end
 
-  def extract_status_mapping
-    # TODO: из эвристики
-    {}
+    def extract_status_mapping
+    mapping = []
+    @manifest.webhooks_map.each do |name, endpoint|
+      schema = SchemaExtractor.request_schema(endpoint.operation)
+      next unless schema
+
+      event_field = find_event_field(schema)
+      next unless event_field && event_field.respond_to?(:enum) && event_field.enum
+
+      event_field.enum.each do |event_value|
+        internal = map_event_to_status(event_value)
+        mapping << [event_value, internal] if internal
+      end
+    end
+    mapping.uniq
+  end
+
+  def find_event_field(schema)
+    properties = schema.properties
+    return nil unless properties
+
+    # Проверяем наличие ключей через прямой доступ
+    return properties['event'] if properties['event']
+    return properties['type'] if properties['type']
+    nil
+  end
+
+  def map_event_to_status(event)
+    case event.downcase
+    when /completed|succeeded|approved/
+      'approved'
+    when /failed|error|declined|rejected|cancelled/
+      'rejected'
+    when /pending|processing|in_progress/
+      'in_progress'
+    else
+      nil
+    end
   end
 
   def extract_error_mapping

@@ -1,7 +1,11 @@
 class Provider::NovapayPayoutApiService < BaseService
-  BASE_URL = ENV.fetch('NOVAPAY_PAYOUT_API_BASE_URL', 'https://api.sandbox.novapay.example/v1')
+  BASE_URL = ENV.fetch('NOVAPAY_PAYOUT_API_BASE_URL', 'https://api.novapay.example/v1')
 
   STATUS_MAP = {
+    'payout.completed' => 'approved',
+    'payout.failed' => 'rejected',
+    'payout.processing' => 'in_progress',
+    'payout.cancelled' => 'rejected',
   }.freeze
 
   ERROR_MAP = {
@@ -19,7 +23,7 @@ class Provider::NovapayPayoutApiService < BaseService
     failure(:unauthorized, 'provider.invalid_credentials')
   rescue => e
     failure(:internal_error, 'provider.unexpected_error')
-  end
+end
 
 private
 
