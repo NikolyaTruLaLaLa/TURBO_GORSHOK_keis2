@@ -5,7 +5,9 @@ class ServiceManifest
                  schemas_map,
                  endpoints_map,
                  webhooks_map)
+
     @provider_name = provider_name
+    #@servers = 
     @schemas_map = schemas_map
     @endpoints_map = endpoints_map
     @webhooks_map = webhooks_map

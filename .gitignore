@@ -1,0 +1,74 @@
+# Игнорируем служебные файлы Ruby
+*.rbc
+*.gem
+*.lock
+*.so
+*.o
+*.a
+mkmf.log
+
+# База данных SQLite (если используете)
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-*
+
+# Логи и временные файлы
+log/
+tmp/
+*.log
+*.pid
+*.tmp
+
+# Зависимости Bundler (обычно не хранят в репозитории)
+vendor/bundle/
+.bundle/
+Gemfile.lock
+# Если вы хотите фиксировать Gemfile.lock (рекомендуется для приложений), закомментируйте строку выше
+
+# Переменные окружения и конфиденциальные данные
+.env
+.env.local
+.env.*.local
+*.secrets
+config/database.yml  # если храните пароли в БД — лучше вынести в example
+
+# Файлы IDE и редакторов
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.byebug_history
+
+# Отчёты о покрытии тестов
+coverage/
+.simplecov
+.rspec_status
+spec/reports/
+test/reports/
+
+# Локальные конфигурации Rubocop
+.rubocop-http.yml
+.rubocop-https.yml
+
+# Файлы документации
+doc/
+rdoc/
+
+# Утилиты сборки
+pkg/
+*.gem
+*.tar.gz
+
+# Если используете Docker
+.dockerignore
+
+# Папка с ассетами (если собираете фронтенд)
+node_modules/
+public/assets/
+public/packs/
+public/packs-test/
+
+# Файлы отладки
+ruby_debug-*
