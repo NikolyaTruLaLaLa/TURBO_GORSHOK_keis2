@@ -123,6 +123,6 @@ npx @apidevtools/swagger-cli bundle yaml_examples/openapi.yaml -o yaml_examples/
 
 ruby fix_schema.rb yaml_examples/openapi.yaml
 ```
-
+Обращаем ваше внимание на актуальность версии node.js
 
 ---
