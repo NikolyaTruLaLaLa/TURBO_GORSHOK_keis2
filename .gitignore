@@ -72,3 +72,5 @@ public/packs-test/
 
 # Файлы отладки
 ruby_debug-*
+
+generated/

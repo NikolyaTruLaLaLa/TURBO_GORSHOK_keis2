@@ -1,4 +1,4 @@
-<%-
+<%- 
   # Принимает переменные:
   # has_payout: boolean
   # has_deposit: boolean
@@ -17,22 +17,27 @@ def create_request(operation, request_method = 'create')
   else
     return failure(:unprocessable_entity, 'unknown_request_method')
   end
-  <%- elsif has_payout -%>
-    payload = build_payout_payload(operation)
-    endpoint = '<%= payout_path %>'
-  <%- elsif has_deposit -%>
-    payload = build_deposit_payload(operation)
-    endpoint = '<%= deposit_path %>'
-  <%- else -%>
-    raise NotImplementedError, "No create endpoint found"
-  <%- end -%>
+<%- elsif has_payout -%>
+  payload = build_payout_payload(operation)
+  endpoint = '<%= payout_path %>'
+<%- elsif has_deposit -%>
+  payload = build_deposit_payload(operation)
+  endpoint = '<%= deposit_path %>'
+<%- else -%>
+  raise NotImplementedError, "No create endpoint found"
+<%- end -%>
 
-    response = client.post("\#{BASE_URL}\#{endpoint}", json: payload, headers: auth_headers)
+  headers = auth_headers
+  if operation.respond_to?(:id) && operation.id.present?
+    headers['Idempotency-Key'] = operation.id.to_s
+  end
 
-    unless response.status.between?(200, 299)
-      error_key = ERROR_MAP[response.status] || 'unknown_error'
-      return failure(error_key, "provider.http_error_#{response.status}")
-    end
+  response = client.post("#{BASE_URL}#{endpoint}", json: payload, headers: headers)
 
-    parse_create_response(operation, response, request_method)
+  unless response.status.between?(200, 299)
+    error_key = ERROR_MAP[response.status] || 'unknown_error'
+    return failure(error_key, "provider.http_error_#{response.status}")
+  end
+
+  parse_create_response(operation, response, request_method)
 end
