@@ -1,6 +1,9 @@
+# base_service.rb
 require 'faraday'
 require 'json'
+require 'base64'
 
+# Класс результата, соответствующий контракту
 class ServiceResult
   attr_reader :success, :data, :error
 
@@ -26,10 +29,12 @@ class BaseService
     @credentials = credentials
   end
 
+  # Базовый метод для super в check_conditions
   def check_conditions(operation, request_method)
-    success
+    ServiceResult.new(success: true)
   end
 
+  # Заглушки для process_callback
   def approve_operation(payout_id)
     # логика одобрения
   end
@@ -45,16 +50,19 @@ class BaseService
   private
 
   def client
-  @client ||= Faraday.new(url: self.class::BASE_URL) do |conn|
-    conn.request :json
-    conn.response :json # или просто conn.response :json
-    conn.adapter Faraday.default_adapter
+    @client ||= Faraday.new(url: self.class::BASE_URL) do |conn|
+      conn.request :json
+      conn.response :json
+      conn.adapter Faraday.default_adapter
+    end
   end
-end
 
+  # Basic Auth для ЮKassa
   def auth_headers
-    { 'X-API-Key' => credentials.api_key }
-  end
+  {
+    'Authorization' => 'Basic ' + Base64.strict_encode64("#{credentials.shop_id}:#{credentials.secret_key}")
+  }
+end
 
   def failure(code, message)
     ServiceResult.new(success: false, error: { code: code, message: message })
@@ -65,11 +73,18 @@ end
   end
 
   def parse_create_response(operation, response, request_method)
-    if response.status == 201
-      operation.provider_operation_id = response.body['id'] if operation.respond_to?(:provider_operation_id=)
-      success(operation)
+    if response.status == 200 || response.status == 201
+      body = response.body
+      operation.provider_operation_id = body['id'] if operation.respond_to?(:provider_operation_id=)
+      # Для платежей ЮKassa возвращает confirmation_url
+      if body['confirmation'] && body['confirmation']['confirmation_url']
+        return success(operation: operation, confirmation_url: body['confirmation']['confirmation_url'])
+      end
+      success(operation: operation)
     else
-      failure(ERROR_MAP[response.status] || 'unknown_error', response.body.dig('error', 'message'))
+      error_code = ERROR_MAP[response.status] || 'unknown_error'
+      error_message = response.body.dig('error', 'description') || response.body['error'] || "HTTP #{response.status}"
+      failure(error_code, error_message)
     end
   end
 
