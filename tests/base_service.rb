@@ -2,6 +2,8 @@
 require 'faraday'
 require 'json'
 require 'base64'
+require 'securerandom'
+require 'ostruct'
 
 # Класс результата, соответствующий контракту
 class ServiceResult
@@ -49,18 +51,23 @@ class BaseService
 
   private
 
-  def client
-    @client ||= Faraday.new(url: self.class::BASE_URL) do |conn|
-      conn.request :json
-      conn.response :json
-      conn.adapter Faraday.default_adapter
-    end
+  
+
+def client
+  @client ||= Faraday.new(url: self.class::BASE_URL) do |conn|
+    conn.request :json
+    conn.response :json
+    #conn.response :logger, nil, headers: true, bodies: true   # добавить эту строку
+    conn.adapter Faraday.default_adapter
   end
+end
 
   # Basic Auth для ЮKassa
   def auth_headers
   {
-    'Authorization' => 'Basic ' + Base64.strict_encode64("#{credentials.shop_id}:#{credentials.secret_key}")
+    'Authorization' => 'Basic MTQ1NzA1Njp0ZXN0X2ZJUmszNjBMQkkwS29HeVp5LW5QYW5SaGtTMDh0a2pqdzZhdFI5Z05HYzg=',
+    'Content-Type' => 'application/json',
+    'Idempotence-Key' => 'op_test_001'
   }
 end
 
@@ -70,6 +77,40 @@ end
 
   def success(data = {})
     ServiceResult.new(success: true, data: data)
+  end
+
+  def get_request(url, headers)
+    uri = URI.parse(url)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = (uri.scheme == 'https')
+    http.open_timeout = 30
+    http.read_timeout = 30
+
+    request = Net::HTTP::Get.new(uri.path)
+    headers.each { |k, v| request[k] = v }
+    response = http.request(request)
+    OpenStruct.new(status: response.code.to_i, body: JSON.parse(response.body), headers: response.to_hash)
+  rescue => e
+    raise
+  end
+
+  def post_request(url, payload, headers)
+    uri = URI.parse(url)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = (uri.scheme == 'https')
+    http.open_timeout = 30
+    http.read_timeout = 30
+
+    request = Net::HTTP::Post.new(uri.path)
+    headers.each { |k, v| request[k] = v }
+    request.body = payload.to_json
+
+    response = http.request(request)
+    # Обёртка для единообразия
+    OpenStruct.new(status: response.code.to_i, body: JSON.parse(response.body), headers: response.to_hash)
+  rescue => e
+    # обработка ошибок
+    raise
   end
 
   def parse_create_response(operation, response, request_method)
