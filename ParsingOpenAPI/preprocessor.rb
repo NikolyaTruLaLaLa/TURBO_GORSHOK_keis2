@@ -19,6 +19,7 @@ class Preprocessor
   attr_reader :webhooks_map
   attr_reader :servers_map
   attr_reader :heuristic_data
+  attr_reader :security_schemes_map
 
   HTTP_METHODS = %i[
     get
@@ -40,6 +41,7 @@ class Preprocessor
     @webhooks_map = {}
     @servers_map = {}
     @heuristic_data = []
+    @security_schemes_map = {}
 
     @document = Openapi3Parser.load_file(spec_path)
   end
@@ -50,6 +52,7 @@ class Preprocessor
     fill_webhooks
     fill_servers
     fill_heuristic_data
+    fill_security_schemes
 
     print_maps
 
@@ -60,7 +63,8 @@ class Preprocessor
       endpoints_map,
       webhooks_map,
       servers_map,
-      heuristic_data # добавляем шестой аргумент
+      heuristic_data,
+      security_schemes_map
     )
   end
 
@@ -69,6 +73,12 @@ class Preprocessor
   def fill_servers
     @servers_map = @document.servers.each_with_object({}) do |server, servers|
       servers[server.description] = server.url
+    end
+  end
+
+  def fill_security_schemes
+    @document.components.security_schemes.each do |name, security_scheme|
+      @security_schemes_map[name] = security_scheme
     end
   end
 
