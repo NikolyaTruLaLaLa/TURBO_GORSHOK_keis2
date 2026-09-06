@@ -29,7 +29,7 @@ def create_request(operation, request_method = 'create')
 
   headers = auth_headers
   if operation.respond_to?(:id) && operation.id.present?
-    headers['Idempotency-Key'] = operation.id.to_s
+    headers['Idempotence-Key'] = operation.id.to_s
   end
 
   response = client.post("#{BASE_URL}#{endpoint}", json: payload, headers: headers)

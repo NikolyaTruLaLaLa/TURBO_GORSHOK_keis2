@@ -6,7 +6,9 @@ require 'erb'
 class DataFieldsEncryptionHandler < HeuristicHandler
   def handle(manifest)
     heuristic_entry = manifest.heuristic_data.find { |h| h[:name] == 'DataFieldsEncryptionHeuristic' }
-    return '' unless heuristic_entry
+    return <<~RUBY unless heuristic_entry
+      # TODO: Webhook signing not detected in specification
+    RUBY
 
     data = heuristic_entry[:finded_data]
     sensitive_fields = data[:sensitive_fields] || {}

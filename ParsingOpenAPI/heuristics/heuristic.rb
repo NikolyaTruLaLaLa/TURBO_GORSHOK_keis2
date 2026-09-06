@@ -9,9 +9,12 @@ class Heuristic
 
   def find_endpoint_by_keywords(endpoints, keywords)
     endpoints.each do |key, endpoint|
-      op_id = endpoint.operation.operation_id.downcase
+      op_id = endpoint.operation.operation_id
+      next unless op_id
+
+      op_id = op_id.downcase
       path = endpoint.path.downcase
-      # Все ключевые слова должны присутствовать либо в op_id, либо в path
+
       if keywords.all? { |kw| op_id.include?(kw) || path.include?(kw) }
         return endpoint
       end

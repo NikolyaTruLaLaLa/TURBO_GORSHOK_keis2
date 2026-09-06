@@ -6,7 +6,9 @@ require 'erb'
 class DigitalSigningHandler < HeuristicHandler
   def handle(manifest)
     heuristic_entry = manifest.heuristic_data.find { |h| h[:name] == 'DigitalSigningHeuristic' }
-    return '' unless heuristic_entry
+    return <<~RUBY unless heuristic_entry
+      # TODO: DigitalSigning signing not detected in specification
+    RUBY
 
     data = heuristic_entry[:finded_data]
     # data: { "POST /payouts" => { signature_header: "X-Signature", timestamp_header: "X-Timestamp", algorithm: "HMAC-SHA256", ... } }
