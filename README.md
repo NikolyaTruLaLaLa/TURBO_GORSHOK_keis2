@@ -111,9 +111,9 @@ mkdir generated
 Тогда следует выполнить следующие команды — и после этого наш парсер заработает.
 
 ```bash
-npx @apidevtools/swagger-cli bundle yaml_examples/openapi.yaml -o yaml_examples/openapi.yaml --dereference
+npx @apidevtools/swagger-cli bundle yaml_examples/tbank.yaml -o yaml_examples/tbank.yaml --dereference
 
-ruby fix_schema.rb yaml_examples/openapi.yaml
+ruby fix_schema.rb yaml_examples/tbank.yaml
 ```
 
 Обращаем ваше внимание на актуальность версии Node.js.
@@ -121,6 +121,12 @@ ruby fix_schema.rb yaml_examples/openapi.yaml
 ---
 
 В папке `tests` проекта есть файл `test_yookassa.rb`, который проверяет работоспособность сгенерированного нашим генератором провайдера. В этом файле также есть секретные токены, которые позволяют легко запускать эти тесты. Разработчики данного проекта в курсе, что секретные токены надо прятать, но для удобства вашего изучения проекта мы оставим этот секретный токен в открытом репозитории, учитывая, что это токен доступа для тестовой среды, которая не оперирует реальными деньгами, и единственный риск, что злоумышленники смогут изучить наш тестовый пример, что не критично (^_-).
+
+запуск этого теста из корня
+```bash
+cd tests
+ruby test_yookassa.rb
+```
 
 ## Дополнительные доработки для работоспособности в случае тестового примера с YooKassa
 
