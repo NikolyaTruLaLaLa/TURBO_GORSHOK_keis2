@@ -1,33 +1,27 @@
-class Provider::YoomoneyApiReferenceService < BaseService
-  BASE_URL = ENV.fetch('YOOMONEY_API_REFERENCE_BASE_URL', 'https://api.yookassa.ru/v3')
+class Provider::NovapayPayoutApiService < BaseService
+  BASE_URL = ENV.fetch('NOVAPAY_PAYOUT_API_BASE_URL', 'https://api.novapay.example/v1')
 
   STATUS_MAP = {
     'pending' => 'in_progress',
-    'waiting_for_capture' => 'in_progress',
-    'succeeded' => 'approved',
-    'canceled' => 'rejected',
+    'processing' => 'in_progress',
+    'completed' => 'approved',
+    'failed' => 'rejected',
   }.freeze
 
   ERROR_MAP = {
     400 => 'validation_error',
     401 => 'unauthorized',
-    403 => 'forbidden',
+    402 => 'insufficient_balance',
+    409 => 'internal_error',
+    422 => 'validation_error',
+    429 => 'rate_limit',
     500 => 'internal_error',
     404 => 'not_found',
-    429 => 'rate_limit',
   }.freeze
 
   def create_request(operation, request_method = 'create')
-  case request_method
-  when 'deposit'
-    payload = build_deposit_payload(operation)
-    endpoint = '/payments'
-  when 'payout', 'create'
-    payload = build_payout_payload(operation)
-    endpoint = '/payouts'
-  else
-    return failure(:unprocessable_entity, 'unknown_request_method')
-  end
+  payload = build_payout_payload(operation)
+  endpoint = '/payouts'
 
   headers = auth_headers
   if operation.respond_to?(:id) && operation.id.present?
@@ -49,42 +43,15 @@ private
 def build_payout_payload(operation)
   {
     amount: (operation.amount * 100).to_i,
-    payout_destination_data: operation.payout_requisite&.dig('payout_destination_data'),
-    payout_token: operation.payout_requisite&.dig('payout_token'),
-    payment_method_id: operation.payout_requisite&.dig('payment_method_id'),
-    description: operation.payout_requisite&.dig('description'),
-    deal: operation.payout_requisite&.dig('deal'),
-    personal_data: operation.payout_requisite&.dig('personal_data'),
-    metadata: operation.payout_requisite&.dig('metadata'),
-  }.compact
-end
-
-private
-
-def build_deposit_payload(operation)
-  {
-    amount: (operation.amount * 100).to_i,
-    description: operation.deposit_requisite&.dig('description'),
-    receipt: operation.deposit_requisite&.dig('receipt'),
+    currency: operation.currency,
+    external_id: operation.id,
     recipient: {
-      gateway_id: operation.deposit_requisite&.dig('gateway_id')
+      type: operation.payout_requisite&.dig('type'),
+      phone: operation.payout_requisite&.dig('phone'),
+      bank_code: operation.payout_requisite&.dig('bank_code'),
+      bank_name: operation.payout_requisite&.dig('bank_name'),
+      card_number: operation.payout_requisite&.dig('card_number')
     },
-    payment_token: operation.deposit_requisite&.dig('payment_token'),
-    payment_method_id: operation.deposit_requisite&.dig('payment_method_id'),
-    payment_method_data: operation.deposit_requisite&.dig('payment_method_data'),
-    confirmation: operation.deposit_requisite&.dig('confirmation'),
-    save_payment_method: operation.deposit_requisite&.dig('save_payment_method'),
-    capture: operation.deposit_requisite&.dig('capture'),
-    client_ip: operation.deposit_requisite&.dig('client_ip'),
-    metadata: operation.deposit_requisite&.dig('metadata'),
-    airline: operation.deposit_requisite&.dig('airline'),
-    transfers: operation.deposit_requisite&.dig('transfers'),
-    deal: operation.deposit_requisite&.dig('deal'),
-    merchant_customer_id: operation.deposit_requisite&.dig('merchant_customer_id'),
-    payment_order: operation.deposit_requisite&.dig('payment_order'),
-    receiver: operation.deposit_requisite&.dig('receiver'),
-    statements: operation.deposit_requisite&.dig('statements'),
-    pos_link: operation.deposit_requisite&.dig('pos_link'),
   }.compact
 end
 
@@ -93,7 +60,7 @@ end
   public
 
   def fetch_status(operation)
-    response = client.get("\#{BASE_URL}/payments/#{operation.provider_operation_id}", headers: auth_headers)
+    response = client.get("\#{BASE_URL}/payouts/#{operation.provider_operation_id}", headers: auth_headers)
 
     unless response.status.between?(200, 299)
       error_key = ERROR_MAP[response.status] || 'unknown_error'
@@ -112,10 +79,27 @@ end
 public
 
 def process_callback(payload)
-  # TODO: Implement webhook processing according to provider specification
-  failure(:unprocessable_entity, 'webhook_not_implemented')
-end
+  verify_signature!(payload)
+  event = payload['event']
+  payout_id = payload['payout_id']
 
+  case event
+  when 'payout.completed'
+    approve_operation(payout_id)
+  when 'payout.failed'
+    reject_operation(payout_id, payload.dig('error', 'code'))
+  when 'payout.processing'
+    update_operation_status(payout_id, 'in_progress')
+  when 'payout.cancelled'
+    reject_operation(payout_id, payload.dig('error', 'code'))
+  else
+    failure(:unprocessable_entity, 'unknown_event')
+  end
+rescue Provider::SignatureError
+  failure(:unauthorized, 'provider.invalid_signature')
+rescue => e
+  failure(:internal_error, 'provider.unexpected_error')
+end
 
 public
 
@@ -123,21 +107,52 @@ def check_conditions(operation, request_method)
   base_result = super
   return base_result if base_result.failed?
 
-  if operation.payout_requisite.dig('deal', 'id').blank?
-  return failure(:unprocessable_entity, 'id_required')
+  if operation.amount < 100000
+  return failure(:unprocessable_entity, 'amount_too_low')
 end
-  if operation.payout_requisite.dig('deal', 'id').to_s.length < 36
-  return failure(:unprocessable_entity, 'id_too_short')
+  if operation.currency.blank?
+  return failure(:unprocessable_entity, 'currency_required')
 end
-  if operation.payout_requisite.dig('deal', 'id').to_s.length > 50
-  return failure(:unprocessable_entity, 'id_too_long')
+  unless ['RUB'].include?(operation.currency)
+  return failure(:unprocessable_entity, 'invalid_currency_value')
+end
+  if operation.external_id.blank?
+  return failure(:unprocessable_entity, 'external_id_required')
+end
+  if operation.external_id.to_s.length > 64
+  return failure(:unprocessable_entity, 'external_id_too_long')
+end
+  if operation.recipient.blank?
+  return failure(:unprocessable_entity, 'recipient_required')
+end
+  if operation.payout_requisite.dig('recipient', 'type').blank?
+  return failure(:unprocessable_entity, 'type_required')
+end
+  unless ['sbp', 'card'].include?(operation.payout_requisite.dig('recipient', 'type'))
+  return failure(:unprocessable_entity, 'invalid_type_value')
+end
+  if operation.payout_requisite.dig('recipient', 'phone').blank?
+  return failure(:unprocessable_entity, 'phone_required')
+end
+  unless operation.payout_requisite.dig('recipient', 'phone') =~ /^7\d{10}$/
+  return failure(:unprocessable_entity, 'invalid_phone_format')
 end
 
   success
 end
 
-# TODO: Webhook signing not detected in specification
+private
 
+def verify_signature!(payload)
+  provided_signature = request.headers['X-NovaPay-Signature']
+  return unless provided_signature
+
+  secret = credentials.webhook_secret
+  expected_signature = OpenSSL::HMAC.hexdigest('hmacsha256', secret, payload.to_json)
+  unless ActiveSupport::SecurityUtils.secure_compare(expected_signature, provided_signature)
+    raise Provider::SignatureError, "Invalid signature"
+  end
+end
 
 # TODO: DigitalSigning signing not detected in specification
 
@@ -146,17 +161,8 @@ private
 
 def encrypt_sensitive_data(payload)
   encrypted_payload = payload.dup
-  if encrypted_payload.key?('payment_token')
-    encrypted_payload['payment_token'] = encrypt_field(encrypted_payload['payment_token'])
-  end
-  if encrypted_payload.key?('enforce')
-    encrypted_payload['enforce'] = encrypt_field(encrypted_payload['enforce'])
-  end
-  if encrypted_payload.key?('three_d_secure')
-    encrypted_payload['three_d_secure'] = encrypt_field(encrypted_payload['three_d_secure'])
-  end
-  if encrypted_payload.key?('applied')
-    encrypted_payload['applied'] = encrypt_field(encrypted_payload['applied'])
+  if encrypted_payload.key?('card_number')
+    encrypted_payload['card_number'] = encrypt_field(encrypted_payload['card_number'])
   end
   encrypted_payload
 end
@@ -168,17 +174,8 @@ end
 
 def decrypt_sensitive_data(payload)
   decrypted_payload = payload.dup
-  if decrypted_payload.key?('payment_token')
-    decrypted_payload['payment_token'] = decrypt_field(decrypted_payload['payment_token'])
-  end
-  if decrypted_payload.key?('enforce')
-    decrypted_payload['enforce'] = decrypt_field(decrypted_payload['enforce'])
-  end
-  if decrypted_payload.key?('three_d_secure')
-    decrypted_payload['three_d_secure'] = decrypt_field(decrypted_payload['three_d_secure'])
-  end
-  if decrypted_payload.key?('applied')
-    decrypted_payload['applied'] = decrypt_field(decrypted_payload['applied'])
+  if decrypted_payload.key?('card_number')
+    decrypted_payload['card_number'] = decrypt_field(decrypted_payload['card_number'])
   end
   decrypted_payload
 end
