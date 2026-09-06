@@ -32,7 +32,9 @@ class Preprocessor
     trace
   ].freeze
 
-  HEURISTICS = [CreateEndpointHeuristic, WebhookSigningHeuristic, DigitalSigningHeuristic,
+  HEURISTICS = [CreateEndpointHeuristic, 
+                WebhookSigningHeuristic, 
+                DigitalSigningHeuristic,
                 DataFieldsEncryptionHeuristic].freeze
 
   def initialize(spec_path)

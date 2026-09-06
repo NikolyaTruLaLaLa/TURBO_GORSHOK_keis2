@@ -12,7 +12,6 @@ class TestOperation
       'confirmation' => { 'type' => 'redirect', 'return_url' => 'https://example.com/return' },
       'description' => 'Test payment from generator'
     }
-    # Добавляем фиктивный payout_requisite для прохождения check_conditions
     @payout_requisite = attrs[:payout_requisite] || {
   'deal' => { 'id' => '1da5c87d-0984-50e8-a7f3-8de646dd9ec9' }
 }

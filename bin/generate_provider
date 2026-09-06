@@ -5,17 +5,20 @@ require 'optparse'
 require_relative '../generator_pipeline'
 require_relative '../rendering/service_render'
 require_relative '../rendering/fixtures_render'
+require_relative '../rendering/documentation_render'
 
 
 options = {
   input: nil,
-  output: 'generated'
+  output: 'generated',
+  name: 'novapay_service' 
 }
 
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: generate_provider [options]"
   opts.on("-i", "--input FILE", "OpenAPI YAML file path") { |v| options[:input] = v }
   opts.on("-o", "--output DIR", "Output directory (default: generated)") { |v| options[:output] = v }
+  opts.on("-n", "--name NAME", "Service file base name (without .rb, default: novapay_service)") { |v| options[:name] = v }
   opts.on("-h", "--help", "Show this help") do
     puts opts
     exit
@@ -30,9 +33,12 @@ unless options[:input]
   exit 1
 end
 
+service_filename = options[:name].end_with?('.rb') ? options[:name] : "#{options[:name]}.rb"
+
 pipeline = GeneratorPipeline.new(renders: [
-  ServiceRender.new('novapay_service.rb'),
-  FixturesRender.new('fixtures.json')
+  ServiceRender.new(service_filename),
+  FixturesRender.new(options[:name] + '_fixtures.json'),
+  DocumentationRender.new(options[:name] + '_integration.md')
 ], file_path: options[:input])
 
 pipeline.run(options[:output])
