@@ -36,7 +36,7 @@
 
 ```bash
 mkdir generated
-./bin/generate_provider -i yaml_examples/provider_api.yaml -o generated            
+./bin/generate_provider -i yaml_examples/provider_api.yaml -o generated -n provider            
 ```
 
 Стоит обратить внимание, что в команде указана спецификация из тестового задания. При необходимости ее можно заменить на другую.
