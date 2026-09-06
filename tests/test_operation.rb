@@ -1,20 +1,22 @@
 class TestOperation
-  attr_accessor :id, :amount, :currency, :payout_requisite, :provider_operation_id, :external_id, :recipient
+  attr_accessor :id, :amount, :currency, :deposit_requisite, :payout_requisite,
+                :provider_operation_id, :external_id, :recipient
 
-  def initialize(attributes = {})
-    @id = attributes[:id] || 'op_test_001'
-    @external_id = attributes[:external_id] || @id
-    @amount = attributes[:amount] || 1500000
-    @currency = attributes[:currency] || 'RUB'
-    @payout_requisite = attributes[:payout_requisite] || {
-      'recipient' => {
-        'type' => 'sbp',
-        'phone' => '79001234567',
-        'bank_code' => '044525225',
-        'bank_name' => 'Сбербанк'
-      }
+  def initialize(attrs = {})
+    @id = attrs[:id] || 'op_test_001'
+    @external_id = attrs[:external_id] || @id
+    @amount = attrs[:amount] || 10000
+    @currency = attrs[:currency] || 'RUB'
+    @deposit_requisite = attrs[:deposit_requisite] || {
+      'payment_method_data' => { 'type' => 'bank_card' },
+      'confirmation' => { 'type' => 'redirect', 'return_url' => 'https://example.com/return' },
+      'description' => 'Test payment from generator'
     }
-    @recipient = @payout_requisite['recipient']  # для проверки operation.recipient
+    # Добавляем фиктивный payout_requisite для прохождения check_conditions
+    @payout_requisite = attrs[:payout_requisite] || {
+  'deal' => { 'id' => '1da5c87d-0984-50e8-a7f3-8de646dd9ec9' }
+}
+    @provider_operation_id = nil
   end
 
   def update(attrs)

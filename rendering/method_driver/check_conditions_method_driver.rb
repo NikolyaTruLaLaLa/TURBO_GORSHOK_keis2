@@ -6,20 +6,20 @@ require 'erb'
 class CheckConditionsMethodDriver < MethodDriver
   def generate(manifest)
     heuristic_entry = manifest.heuristic_data.find { |h| h[:name] == 'CreateEndpointHeuristic' }
-    return '' unless heuristic_entry
+    return default_method unless heuristic_entry
 
     finded_data = heuristic_entry[:finded_data]
     payout_data = finded_data[:payout_create_endpoint]
-    return '' unless payout_data
+    return default_method unless payout_data
 
     schema = payout_data[:request_schema]
     if schema.is_a?(String)
       schema = manifest.schemas_map[schema]
     end
-    return '' unless schema
+    return default_method unless schema
 
-    # Генерируем проверки для всех полей схемы
     validations = generate_validations(schema, 'payout')
+    return default_method if validations.empty?
 
     template_path = File.join(__dir__, '../templates/methods/_check_conditions.erb')
     template = ERB.new(File.read(template_path), trim_mode: '-')
@@ -27,6 +27,19 @@ class CheckConditionsMethodDriver < MethodDriver
   end
 
   private
+
+  def default_method
+    <<~RUBY
+      public
+
+      def check_conditions(operation, request_method)
+        base_result = super
+        return base_result if base_result.failed?
+        # TODO: Add validation logic based on provider schema
+        success
+      end
+    RUBY
+  end
 
   def generate_validations(schema, type, prefix = nil)
     validations = []

@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+# bin/generate_provider
+
+require 'optparse'
+require_relative '../generator_pipeline'
+require_relative '../rendering/service_render'
+require_relative '../rendering/fixtures_render'
+
+
+options = {
+  input: nil,
+  output: 'generated'
+}
+
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: generate_provider [options]"
+  opts.on("-i", "--input FILE", "OpenAPI YAML file path") { |v| options[:input] = v }
+  opts.on("-o", "--output DIR", "Output directory (default: generated)") { |v| options[:output] = v }
+  opts.on("-h", "--help", "Show this help") do
+    puts opts
+    exit
+  end
+end
+
+parser.parse!
+
+unless options[:input]
+  puts "Error: --input is required"
+  puts parser
+  exit 1
+end
+
+pipeline = GeneratorPipeline.new(renders: [
+  ServiceRender.new('novapay_service.rb'),
+  FixturesRender.new('fixtures.json')
+], file_path: options[:input])
+
+pipeline.run(options[:output])

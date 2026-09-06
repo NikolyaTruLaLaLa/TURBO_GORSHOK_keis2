@@ -57,19 +57,50 @@ class ServiceRender < BaseRender
 
   def extract_status_mapping
     mapping = []
-    @manifest.webhooks_map.each do |name, endpoint|
-      schema = SchemaExtractor.request_schema(endpoint.operation)
-      next unless schema
+    # Ищем эндпоинт статуса (для payment или payout)
+    status_endpoint = find_status_endpoint_for_mapping
+    return mapping unless status_endpoint
 
-      event_field = find_event_field(schema)
-      next unless event_field && event_field.respond_to?(:enum) && event_field.enum
+    schema = SchemaExtractor.response_schema(status_endpoint.operation, '200')
+    return mapping unless schema
 
-      event_field.enum.each do |event_value|
-        internal = map_event_to_status(event_value)
-        mapping << [event_value, internal] if internal
-      end
+    status_field = find_status_field(schema)
+    return mapping unless status_field && status_field.respond_to?(:enum)
+
+    status_field.enum.each do |status_value|
+      internal = map_status_value(status_value)
+      mapping << [status_value, internal] if internal
     end
     mapping.uniq
+  end
+
+  def find_status_endpoint_for_mapping
+    @manifest.endpoints_map.values.find do |e|
+      e.http_method == :get && e.path.include?('{') &&
+      (e.path.include?('payment') || e.path.include?('payout'))
+    end
+  end
+
+  def find_status_field(schema)
+    properties = schema.properties
+    return nil unless properties
+
+    return properties['status'] if properties['status']
+    return properties['state'] if properties['state']
+    nil
+  end
+
+  def map_status_value(status)
+    case status.downcase
+    when 'pending', 'waiting_for_capture', 'processing'
+      'in_progress'
+    when 'succeeded', 'completed'
+      'approved'
+    when 'canceled', 'failed', 'rejected'
+      'rejected'
+    else
+      nil
+    end
   end
 
   def find_event_field(schema)

@@ -1,4 +1,4 @@
-class Provider::YoomoneyApiReferenceService < BaseService
+class YoomoneyApiReferenceService < BaseService
   BASE_URL = ENV.fetch('YOOMONEY_API_REFERENCE_BASE_URL', 'https://api.yookassa.ru/v3')
 
   STATUS_MAP = {
@@ -33,9 +33,13 @@ class Provider::YoomoneyApiReferenceService < BaseService
   if operation.respond_to?(:id) && operation.id.present?
     headers['Idempotence-Key'] = operation.id.to_s
   end
+puts "🔍 DEBUG: Request URL: #{BASE_URL}#{endpoint}"
+puts "🔍 DEBUG: Headers: #{headers.inspect}"
+puts "🔍 DEBUG: Payload: #{payload.inspect}"
+  response = post_request("#{BASE_URL}#{endpoint}", payload, headers)
 
-  response = client.post("#{BASE_URL}#{endpoint}", json: payload, headers: headers)
-
+puts "🔍 DEBUG: Response status = #{response.status}"
+puts "🔍 DEBUG: Response body = #{response.body.inspect}"  # для 401 увидим, что пишет ЮKassa
   unless response.status.between?(200, 299)
     error_key = ERROR_MAP[response.status] || 'unknown_error'
     return failure(error_key, "provider.http_error_#{response.status}")
@@ -62,13 +66,14 @@ end
 private
 
 def build_deposit_payload(operation)
-  {
-    amount: (operation.amount * 100).to_i,
+  payload = {
+    amount: {
+      value: sprintf("%.2f", operation.amount / 100.0),
+      currency: operation.currency || 'RUB'
+    },
     description: operation.deposit_requisite&.dig('description'),
     receipt: operation.deposit_requisite&.dig('receipt'),
-    recipient: {
-      gateway_id: operation.deposit_requisite&.dig('gateway_id')
-    },
+    # recipient убираем полностью
     payment_token: operation.deposit_requisite&.dig('payment_token'),
     payment_method_id: operation.deposit_requisite&.dig('payment_method_id'),
     payment_method_data: operation.deposit_requisite&.dig('payment_method_data'),
@@ -93,7 +98,7 @@ end
   public
 
   def fetch_status(operation)
-    response = client.get("\#{BASE_URL}/payments/#{operation.provider_operation_id}", headers: auth_headers)
+    response = get_request("#{BASE_URL}/payments/#{operation.provider_operation_id}", auth_headers)
 
     unless response.status.between?(200, 299)
       error_key = ERROR_MAP[response.status] || 'unknown_error'

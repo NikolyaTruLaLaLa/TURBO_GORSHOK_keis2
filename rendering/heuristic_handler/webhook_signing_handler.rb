@@ -5,7 +5,9 @@ require 'erb'
 class WebhookSigningHandler < HeuristicHandler
   def handle(manifest)
     heuristic_entry = manifest.heuristic_data.find { |h| h[:name] == 'WebhookSigningHeuristic' }
-    return '' unless heuristic_entry
+    return <<~RUBY unless heuristic_entry
+      # TODO: Webhook signing not detected in specification
+    RUBY
 
     data = heuristic_entry[:finded_data]
     # data имеет вид { "POST /webhooks/payout" => { algorithm: "HMAC-SHA256", header: "X-NovaPay-Signature" } }
